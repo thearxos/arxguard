@@ -42,6 +42,15 @@ _arxguard_scan() {
   # remote download piped into a ROOT shell
   [[ "$lc" =~ (curl|wget|fetch|http)[[:space:]].*\|[[:space:]]*sudo[[:space:]]+(ba|z|da|c|k)?sh ]] \
     && _f 2 "[CRITICAL] remote script piped straight into a root shell (… | sudo sh)"
+  # reverse shell — interactive shell wired to a raw socket
+  [[ "$lc" =~ (bash|sh|zsh)[[:space:]]+-i[[:space:]].*(/dev/tcp/|/dev/udp/) || "$lc" =~ (/dev/tcp/|/dev/udp/)[0-9a-z.:_-]+[[:space:]]*(0?<&1|<&|>&)[[:space:]]*[0-9] ]] \
+    && _f 2 "[CRITICAL] reverse shell — interactive shell bound to a raw TCP/UDP socket (/dev/tcp)"
+  # nc/ncat/socat/named-pipe wiring a shell to the network
+  [[ "$lc" =~ (^|[[:space:]|&;])(nc|ncat)[[:space:]].*-e[[:space:]]+[^[:space:]]*sh || "$lc" =~ socat[[:space:]].*exec[:=] || "$lc" =~ mkfifo[[:space:]].*\|[[:space:]]*(ba|z|c|k)?sh ]] \
+    && _f 2 "[CRITICAL] reverse shell — nc/socat/named-pipe binding a shell to the network"
+  # interpreter opening a socket back to a shell
+  [[ "$lc" =~ (python[0-9]?|perl|ruby|php)[[:space:]].*socket.*(/bin/(ba)?sh|pty\.spawn|exec[lv]) ]] \
+    && _f 2 "[CRITICAL] reverse shell — interpreter opening a socket into a shell"
 
   # ── MEDIUM (warn) ─────────────────────────────────────────────────────────
   # plain download | interpreter
