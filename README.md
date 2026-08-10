@@ -1,51 +1,47 @@
 # arxguard — ARXOS zero-trust terminal command guard
 
-**Your browser catches homograph URLs. Your terminal doesn't. arxguard does.**
+**Your browser catches dangerous terminal content. arxguard brings that gate to ARXOS.**
 
-arxguard screens every command you run, *before it executes*, for the threats a
-terminal renders without question:
+arxguard is an independent, dependency-free pre-execution screen for interactive shell commands. Its threat model is informed by public research, including [sheeki03/tirith](https://github.com/sheeki03/tirith), but arxguard does not vendor tirith source code or depend on it at runtime.
 
-- **Homograph / IDN spoofs** — `curl … | bash` where a hostname hides a Cyrillic
-  `і` (U+0456) that resolves to an attacker's server.
-- **Hidden payloads** — bidi overrides (U+202E), zero-width / invisible chars.
-- **Obfuscated execution** — `base64 -d | sh`, `xxd -r | bash`, `openssl enc -d | sh`.
-- **Pipe-to-shell** — `curl … | sh` (warn) and `curl … | sudo sh` (block).
-- **Credential exfiltration** — network commands touching `~/.ssh`, `.aws`, `.env`,
-  `.git-credentials`, kube/docker configs.
-- **Destructive commands** — `rm -rf /`, fork bombs, `dd`/`mkfs`/`wipefs` to a disk.
+## Detection layers
 
-On **bash** it *blocks* CRITICAL findings and *warns* on MEDIUM. On **zsh** it is
-warn-only (zsh's preexec can't abort a command — use bash for blocking).
+- Homograph / non-ASCII URL indicators, bidi and zero-width Unicode
+- ANSI/OSC terminal-control injection
+- Base64/hex/OpenSSL decode-to-shell chains
+- `curl|sh`, `wget|bash`, and root pipe-to-shell patterns
+- Reverse shells via `/dev/tcp`, `nc`, `socat`, interpreters and FIFOs
+- Credential/secret references in network commands
+- Package signature bypasses such as `pacman --nogpgcheck`, `apt --allow-unauthenticated`, and equivalent patterns
+- Insecure TLS downloads (`curl -k` / `--insecure`)
+- Direct URL package/tool installation
+- Remote Kubernetes/Helm manifests
+- Cloud metadata endpoint access
+- Proxy/PATH/LD_PRELOAD environment manipulation
+- Persistence changes to shell startup, cron, and `authorized_keys`
+- Destructive disk operations and recursive deletion
 
-## Why this exists (and what it is not)
-This is a **minimal, self-owned reimplementation** of the threat model pioneered by
-[sheeki03/tirith](https://github.com/sheeki03/tirith). ARXOS does **not** vendor
-tirith's engine — per our doctrine we reimplement only the essential checks we need,
-in dependency-free shell, and keep an **upstream watch** so we notice when the
-upstream model advances:
+Bash blocks CRITICAL findings and warns on MEDIUM findings. The scanner is a pre-execution gate, not a runtime sandbox or antivirus.
 
-```
-arxguard upstream-check     # alerts if sheeki03/tirith has shipped a newer model
-arxguard upstream-ack       # accept the current upstream as the new baseline
-```
+## Commands
 
-## Design
-- **Zero forks on the hot path.** The bash scanner is pure builtins
-  (`${c,,}`, `[[ =~ ]]`, byte-oriented matching) — one history read + one
-  in-process scan per typed line, no per-command binary. Frugal enough to run on
-  every command by default.
-- **Fail-open, never wedge your shell.** A bypass is always one keystroke away:
-  `ARXGUARD=0 <command>` runs the next command unscreened.
-
-## Use
-```
-arxguard test               # built-in detection self-test
-arxguard check -- '<cmd>'   # screen a command by hand  (exit 0 clean · 2 warn · 1 block)
-arxguard status             # live protection state for this shell
-arxguard install            # wire it into your shell rc (or it's distro-wide via profile.d)
+```bash
+arxguard test
+arxguard check -- 'command'
+arxguard status
+arxguard install
+arxguard upstream-check
+arxguard upstream-ack
 ```
 
-Installed distro-wide by `install.sh` (drops `/etc/profile.d/arxguard.sh`), so every
-interactive shell on ARXOS is guarded with zero setup.
+The upstream watch is intentionally advisory: a new tirith release is a prompt for ARXOS to review new threat categories, not an automatic code import.
 
-`arxguard 0.0.1 — ARXOS`
+Per-command emergency bypass remains explicit:
+
+```bash
+ARXGUARD=0 <command>
+```
+
+## Development
+
+The scanner is kept on the hot path without external processes. Regression vectors live under `tests/`, including independent tirith-inspired cases for terminal injection, package-signature bypass, reverse shells, insecure downloads, environment hijacking and cloud metadata access.
