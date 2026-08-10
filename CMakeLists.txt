@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.16)
 project(arxguard_native C)
-
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+enable_testing()
 
 add_library(arxguard_engine STATIC src/arxguard_engine.c)
 target_include_directories(arxguard_engine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -14,7 +14,11 @@ target_include_directories(arxguard_engine_shared PUBLIC ${CMAKE_CURRENT_SOURCE_
 target_compile_options(arxguard_engine_shared PRIVATE -O3 -fno-plt -fvisibility=hidden)
 set_target_properties(arxguard_engine_shared PROPERTIES OUTPUT_NAME arxguard_engine)
 
-# Bash loadable builtin is optional because distributions place Bash headers differently.
+add_executable(arxguard_native_tests tests/native_engine.c)
+target_link_libraries(arxguard_native_tests PRIVATE arxguard_engine)
+target_include_directories(arxguard_native_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+add_test(NAME arxguard_native_vectors COMMAND arxguard_native_tests)
+
 find_path(BASH_INCLUDE_DIR builtins.h PATHS /usr/include/bash /usr/local/include/bash)
 if(BASH_INCLUDE_DIR)
   add_library(arxguard_native SHARED src/arxguard_builtin.c src/arxguard_engine.c)
