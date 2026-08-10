@@ -24,11 +24,9 @@ int arxguard_prefilter_bytes(const unsigned char *p, size_t n) {
     const uint8x16_t esc = vdupq_n_u8(0x1b);
     while (n >= 16) {
         uint8x16_t v = vld1q_u8(p);
-        uint8x16_t high = vcgeq_u8(v, hi);
-        uint8x16_t control = vceqq_u8(v, esc);
-        uint64x2_t h = vreinterpretq_u64_u8(vorrq_u8(high, control));
-        if (vgetq_lane_u64(vreinterpret_u64_u8(vget_low_u8(vreinterpretq_u8_u64(h))), 0) ||
-            vgetq_lane_u64(vreinterpret_u64_u8(vget_high_u8(vreinterpretq_u8_u64(h))), 0)) return 1;
+        uint8x16_t flags = vorrq_u8(vcgeq_u8(v, hi), vceqq_u8(v, esc));
+        uint64x2_t bits = vreinterpretq_u64_u8(flags);
+        if (vgetq_lane_u64(bits, 0) || vgetq_lane_u64(bits, 1)) return 1;
         p += 16; n -= 16;
     }
 #endif
