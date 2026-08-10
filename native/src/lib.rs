@@ -3,6 +3,7 @@
 use std::slice;
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 pub struct ArxTier2Result { pub code: i32, pub flags: u32 }
 
 const URL: u32 = 1 << 0;
@@ -23,15 +24,12 @@ fn contains_ci(h: &[u8], n: &[u8]) -> bool {
 fn analyze(input: &[u8]) -> ArxTier2Result {
     let mut flags = 0;
     if contains_ci(input, b"http://") || contains_ci(input, b"https://") || contains_ci(input, b"ssh://") { flags |= URL; }
-    // URL-bearing non-ASCII text is escalated for IDN/homograph-aware handling.
     if flags & URL != 0 && input.iter().any(|b| *b >= 0x80) { flags |= CONFUSABLE; }
-    // Shell metacharacter density is intentionally only a signal; C Tier-1 owns hard blocks.
     let meta = input.iter().filter(|b| matches!(**b, b'|'|b';'|b'&'|b'`'|b'$'|b'<'|b'>')).count();
     if meta >= 3 { flags |= SHELL_META; }
-    // Long encoded-looking tokens are handed to deeper decoding logic instead of decoding on the hot path.
     let alpha = input.iter().filter(|b| b.is_ascii_alphanumeric() || **b == b'+' || **b == b'/').count();
     if alpha >= 32 && alpha * 100 / input.len().max(1) > 70 && input.iter().any(|b| *b == b'=') { flags |= OBFUSCATED; }
-    let code = if flags & CONFUSABLE != 0 { 2 } else if flags & (OBFUSCATED|SHELL_META) != 0 { 2 } else { 0 };
+    let code = if flags & (CONFUSABLE|OBFUSCATED|SHELL_META) != 0 { 2 } else { 0 };
     ArxTier2Result { code, flags }
 }
 
@@ -43,9 +41,10 @@ pub extern "C" fn arxguard_tier2_scan(ptr: *const u8, len: usize, out: *mut ArxT
         let bytes = unsafe { slice::from_raw_parts(ptr, len) };
         analyze(bytes)
     };
+    let code = result.code;
     // SAFETY: `out` was checked non-null and points to caller-owned result storage.
     unsafe { *out = result; }
-    result.code
+    code
 }
 
 #[cfg(test)]
