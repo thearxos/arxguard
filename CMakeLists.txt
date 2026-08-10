@@ -1,0 +1,38 @@
+cmake_minimum_required(VERSION 3.16)
+project(arxguard_native C)
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+enable_testing()
+
+add_library(arxguard_engine STATIC src/arxguard_engine.c)
+target_include_directories(arxguard_engine PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_compile_options(arxguard_engine PRIVATE -O3 -fno-plt -fvisibility=hidden)
+
+add_library(arxguard_engine_shared SHARED src/arxguard_engine.c)
+target_include_directories(arxguard_engine_shared PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_compile_options(arxguard_engine_shared PRIVATE -O3 -fno-plt -fvisibility=hidden)
+set_target_properties(arxguard_engine_shared PROPERTIES OUTPUT_NAME arxguard_engine)
+
+add_executable(arxguard_native_tests tests/native_engine.c)
+target_link_libraries(arxguard_native_tests PRIVATE arxguard_engine)
+target_include_directories(arxguard_native_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+add_test(NAME arxguard_native_vectors COMMAND arxguard_native_tests)
+
+add_executable(arxguard_native_bench bench/native_bench.c)
+target_link_libraries(arxguard_native_bench PRIVATE arxguard_engine)
+target_compile_options(arxguard_native_bench PRIVATE -O3)
+
+find_path(BASH_INCLUDE_DIR builtins.h PATHS /usr/include/bash /usr/local/include/bash)
+if(BASH_INCLUDE_DIR)
+  add_library(arxguard_native SHARED src/arxguard_builtin.c src/arxguard_engine.c)
+  target_include_directories(arxguard_native PRIVATE ${BASH_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/src)
+  target_compile_options(arxguard_native PRIVATE -O3 -fno-plt -fvisibility=hidden)
+  set_target_properties(arxguard_native PROPERTIES PREFIX "" OUTPUT_NAME arxguard_native)
+endif()
+
+install(TARGETS arxguard_engine_shared LIBRARY DESTINATION lib)
+install(FILES src/arxguard_engine.h DESTINATION include/arxguard)
+if(TARGET arxguard_native)
+  install(TARGETS arxguard_native LIBRARY DESTINATION lib/arxguard)
+endif()
