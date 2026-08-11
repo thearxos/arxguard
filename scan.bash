@@ -2,14 +2,16 @@
 # Threat categories are informed by public research including tirith; no tirith
 # source code is vendored. 0=clean, 2=warn, 1=block.
 _arxguard_scan(){
- local c="$1" lc="${1,,}" worst=0 why="" LC_ALL=C
+ local c="$1" lc="${1,,}" worst=0 why=""
+ LC_ALL=C
  _f(){ local s="$1";shift;((s>worst))&&worst=$s;why+="${why:+$'\n'}$*"; }
  # Terminal injection, Unicode cloaking and homographs.
  [[ "$c" == *$'\e['* || "$c" == *$'\e]'* || "$c" == *$'\eP'* ]]&&_f 2 "[CRITICAL] terminal control sequence detected (ANSI/OSC)"
- [[ "$c" =~ [$'\u200b\u200c\u200d\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2060\u2066\u2067\u2068\u2069\ufeff'] ]]&&_f 2 "[CRITICAL] invisible/bidi Unicode control detected"
- [[ "$c" =~ [$'\u2800\u3164\u115f\u1160'] ]]&&_f 1 "[MEDIUM] invisible filler character detected"
- # Use C-locale byte matching for non-ASCII detection. This avoids relying on
- # locale-specific regex character classes and keeps the hot path in-process.
+ # Use literal Unicode glob matches here instead of =~ character classes.
+ # This keeps the scanner parser-safe across supported Bash releases.
+ [[ "$c" == *$'\u200b'* || "$c" == *$'\u200c'* || "$c" == *$'\u200d'* || "$c" == *$'\u200e'* || "$c" == *$'\u200f'* || "$c" == *$'\u202a'* || "$c" == *$'\u202b'* || "$c" == *$'\u202c'* || "$c" == *$'\u202d'* || "$c" == *$'\u202e'* || "$c" == *$'\u2060'* || "$c" == *$'\u2066'* || "$c" == *$'\u2067'* || "$c" == *$'\u2068'* || "$c" == *$'\u2069'* || "$c" == *$'\ufeff'* ]]&&_f 2 "[CRITICAL] invisible/bidi Unicode control detected"
+ [[ "$c" == *$'\u2800'* || "$c" == *$'\u3164'* || "$c" == *$'\u115f'* || "$c" == *$'\u1160'* ]]&&_f 1 "[MEDIUM] invisible filler character detected"
+ # C-locale byte matching for non-ASCII detection keeps the hot path in-process.
  if [[ "$lc" =~ (https?://|www\.)[^[:space:]/\|\;\&\)\]]+ ]]&& [[ "$c" == *[!$'\x00'-$'\x7f']* ]]; then
    _f 2 "[CRITICAL] non-ASCII hostname/text in a network command (possible homograph)"
  fi
@@ -25,10 +27,7 @@ _arxguard_scan(){
  [[ "$lc" =~ (dd[[:space:]].*of=/dev/(sd|nvme|vd|mmcblk|disk)|mkfs(\.[a-z0-9]+)?[[:space:]]+/dev/|wipefs[[:space:]]|>[[:space:]]*/dev/(sd|nvme|vd)) ]]&&_f 2 "[CRITICAL] raw disk write or format"
  [[ "$lc" =~ (base64[[:space:]]+(-d|--decode)|xxd[[:space:]]+-r|openssl[[:space:]]+enc[[:space:]]+-d).*\|[[:space:]]*(sudo[[:space:]]+)?(ba|z|da|c|k)?sh([[:space:]]|$) ]]&&_f 2 "[CRITICAL] decoded payload piped into a shell"
  [[ "$lc" =~ (curl|wget|fetch|http)[[:space:]].*\|[[:space:]]*sudo[[:space:]]+(ba|z|da|c|k)?sh ]]&&_f 2 "[CRITICAL] remote script piped into root shell"
- # Escalate suspicious remote-to-shell forms, while keeping a plain, direct
- # download-to-interpreter command at WARN. Homograph/network combinations are
- # already escalated above; shell-command chaining and stdout-forcing downloads
- # receive the additional execution-boundary signal here.
+ # Suspicious remote-to-shell forms retain BLOCK without changing plain curl|sh WARN behavior.
  if [[ "$lc" == *"| sh -c "* || "$lc" == *"| bash -c "* || "$lc" == *"| zsh -c "* || "$lc" == *"| dash -c "* || "$lc" == *"| ksh -c "*" ]] ||
     [[ "$lc" == *" -O- | sh"* || "$lc" == *" -O- | bash"* || "$lc" == *" -O- | zsh"* || "$lc" == *" -O- | dash"* || "$lc" == *" -O- | ksh"* ]] ||
     [[ "$lc" == *" --output-document=- | sh"* || "$lc" == *" --output-document=- | bash"* || "$lc" == *" --output-document=- | zsh"* ]]; then
