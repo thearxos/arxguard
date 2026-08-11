@@ -15,6 +15,9 @@ _arxguard_scan(){
  [[ "$lc" =~ (dd[[:space:]].*of=/dev/(sd|nvme|vd|mmcblk|disk)|mkfs(\.[a-z0-9]+)?[[:space:]]+/dev/|wipefs[[:space:]]|>[[:space:]]*/dev/(sd|nvme|vd)) ]]&&_f 2 "[CRITICAL] raw disk write or format"
  [[ "$lc" =~ (base64[[:space:]]+(-d|--decode)|xxd[[:space:]]+-r|openssl[[:space:]]+enc[[:space:]]+-d).*\|[[:space:]]*(sudo[[:space:]]+)?(ba|z|da|c|k)?sh([[:space:]]|$) ]]&&_f 2 "[CRITICAL] decoded payload piped into a shell"
  [[ "$lc" =~ (curl|wget|fetch|http)[[:space:]].*\|[[:space:]]*sudo[[:space:]]+(ba|z|da|c|k)?sh ]]&&_f 2 "[CRITICAL] remote script piped into root shell"
+ # Escalate the combined high-risk signal: non-ASCII network content piped directly into a shell.
+ # This is additive; ordinary download-to-shell remains governed by the WARN rule below.
+ [[ "$lc" =~ (curl|wget|fetch)[[:space:]].*https?://.*\|[[:space:]]*(sudo[[:space:]]+)?(ba|z|da|c|k)?sh([[:space:]]|$) ]] && [[ "$c" == *[!$'\x01'-\x7f']* ]] && _f 2 "[CRITICAL] homograph/IDN network content piped into shell"
  [[ "$lc" =~ (bash|sh|zsh)[[:space:]]+-i[[:space:]].*(/dev/tcp/|/dev/udp/) || "$lc" =~ (/dev/tcp/|/dev/udp/)[0-9a-z.:_-]+[[:space:]]*(0?<&1|<&|>&)[[:space:]]*[0-9] ]]&&_f 2 "[CRITICAL] reverse shell via raw socket"
  [[ "$lc" =~ (^|[[:space:]\|\&;])(nc|ncat)[[:space:]].*-e[[:space:]]+[^[:space:]]*sh || "$lc" =~ socat[[:space:]].*exec[:=] || "$lc" =~ mkfifo[[:space:]].*\|[[:space:]]*(ba|z|c|k)?sh ]]&&_f 2 "[CRITICAL] network-to-shell reverse shell pattern"
  [[ "$lc" =~ (python[0-9]?|perl|ruby|php)[[:space:]].*socket.*(/bin/(ba)?sh|pty\.spawn|exec[lv]) ]]&&_f 2 "[CRITICAL] interpreter opens socket into shell"
@@ -39,6 +42,6 @@ _arxguard_scan(){
 _arxguard_scan_file(){
  local file="$1" line n=0 rc=0 rc_line out
  [ -f "$file" ]||{ printf '[ERROR] file not found: %s\n' "$file";return 2; }
- while IFS= read -r line||[ -n "$line" ];do n=$((n+1));out="$(_arxguard_scan "$line")";rc_line=$?;[ -n "$out" ]&&printf 'line %d: %s\n' "$n" "$out";[ "$rc_line" -gt "$rc" ]&&rc=$rc_line;done<"$file"
+ while IFS= read -r line||[ -n "$line" ];do n=$((n+1));out="$(_arxguard_scan "$line")";rc_line=$?;[ -n "$out" ]&&printf 'line %d: %s\n' "$n: $out";[ "$rc_line" -gt "$rc" ]&&rc=$rc_line;done<"$file"
  return "$rc"
 }
