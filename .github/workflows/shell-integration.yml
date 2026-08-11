@@ -67,4 +67,4 @@ jobs:
           check_block "echo SGVsbG8= | base64 -d | bash"
 
       - name: Verify CTest after installation
-        run: ctest --test-dir build --output-on-failure
+        run: sudo -u "$(stat -c '%U' build)" ctest --test-dir build --output-on-failure
