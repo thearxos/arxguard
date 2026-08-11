@@ -8,8 +8,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install shell integration
+      - name: Install native shell integration
         run: sudo bash ./install.sh
+
+      - name: Verify native scanner installation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -x /usr/local/bin/arxguard_check
+          /usr/local/bin/arxguard_check -- "ls -la" | grep -q '^CLEAN '
+          set +e
+          /usr/local/bin/arxguard_check -- "rm -rf /" >/dev/null 2>&1
+          rc=$?
+          set -e
+          test "$rc" -eq 1
 
       - name: Verify Bash startup
         shell: bash
