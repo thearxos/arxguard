@@ -8,7 +8,7 @@ _arxguard_scan(){
  [[ "$c" == *$'\e['* || "$c" == *$'\e]'* || "$c" == *$'\eP'* ]]&&_f 2 "[CRITICAL] terminal control sequence detected (ANSI/OSC)"
  [[ "$c" =~ [$'\u200b\u200c\u200d\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2060\u2066\u2067\u2068\u2069\ufeff'] ]]&&_f 2 "[CRITICAL] invisible/bidi Unicode control detected"
  [[ "$c" =~ [$'\u2800\u3164\u115f\u1160'] ]]&&_f 1 "[MEDIUM] invisible filler character detected"
- [[ "$lc" =~ (https?://|www\.)[^[:space:]/]*[[:space:]] ]]&& [[ "$c" =~ [^[:ascii:]] ]]&&_f 2 "[CRITICAL] non-ASCII hostname/text in a network command (possible homograph)"
+ [[ "$lc" =~ (https?://|www\.)[^[:space:]/\|\;\&\)\]]+ ]]&& [[ "$c" =~ [^[:ascii:]] ]]&&_f 2 "[CRITICAL] non-ASCII hostname/text in a network command (possible homograph)"
  # Destructive and code-execution patterns.
  [[ "$c" =~ :[[:space:]]*\(\)[[:space:]]*\{[[:space:]]*:[[:space:]]*\|[[:space:]]*:[[:space:]]*\&[[:space:]]*\}[[:space:]]*\;[[:space:]]*: ]]&&_f 2 "[CRITICAL] fork bomb"
  [[ "$lc" =~ (^|[\;\&\|[:space:]])rm[[:space:]]+(-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r|-[rf]+)[a-z]*[[:space:]]+(--[[:space:]]+)?(/|/\*|~|~/|\$home|\.|\.\/\*)([[:space:]]|$) ]]&&_f 2 "[CRITICAL] recursive force deletion targets /, home, or current tree"
@@ -20,6 +20,10 @@ _arxguard_scan(){
  [[ "$lc" =~ (python[0-9]?|perl|ruby|php)[[:space:]].*socket.*(/bin/(ba)?sh|pty\.spawn|exec[lv]) ]]&&_f 2 "[CRITICAL] interpreter opens socket into shell"
  # Transport, package and supply-chain safety.
  [[ "$lc" =~ (curl|wget|fetch)[[:space:]].*\|[[:space:]]*(ba|z|da|c|k)?sh([[:space:]]|$) ]]&&_f 1 "[MEDIUM] download piped to interpreter"
+ # Combining a Unicode/homograph network target with direct shell execution is
+ # materially riskier than either signal alone: keep the existing warning for
+ # ordinary download-to-shell commands, but escalate this compound signal.
+ [[ "$c" =~ [^[:ascii:]] ]] && [[ "$lc" =~ (curl|wget|fetch)[[:space:]].*https?://[^[:space:]]+.*\|[[:space:]]*(sudo[[:space:]]+)?(ba|z|da|c|k)?sh([[:space:]]|$) ]] && _f 2 "[CRITICAL] homograph/Unicode network target piped directly to a shell"
  [[ "$lc" =~ (curl|wget|fetch)[[:space:]].*(-k|--insecure)([[:space:]]|$) ]]&&_f 1 "[MEDIUM] TLS verification disabled"
  [[ "$lc" =~ (apt|apt-get|dnf|yum|pacman)[[:space:]].*(--allow-unauthenticated|--nogpgcheck|SigLevel[[:space:]]*=[[:space:]]*Never|trusted=yes) ]]&&_f 2 "[CRITICAL] package signature/authentication verification disabled"
  [[ "$lc" =~ (git[[:space:]]+clone|pip[[:space:]]+install|npm[[:space:]]+(install|i))[[:space:]].*https?:// ]]&&_f 1 "[MEDIUM] dependency/tool installed directly from a URL"
