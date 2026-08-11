@@ -34,6 +34,10 @@ add_executable(arxguard_native_bench bench/native_bench.c)
 target_link_libraries(arxguard_native_bench PRIVATE arxguard_engine)
 target_compile_options(arxguard_native_bench PRIVATE -O3)
 
+add_executable(arxguard_check tools/arxguard_check.c)
+target_link_libraries(arxguard_check PRIVATE arxguard_engine)
+target_include_directories(arxguard_check PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
 find_path(BASH_INCLUDE_DIR builtins.h PATHS /usr/include/bash /usr/local/include/bash)
 if(BASH_INCLUDE_DIR)
   add_library(arxguard_native SHARED src/arxguard_builtin.c ${ARXGUARD_NATIVE_SOURCES})
