@@ -8,7 +8,7 @@ _arxguard_scan(){
  [[ "$c" == *$'\e['* || "$c" == *$'\e]'* || "$c" == *$'\eP'* ]]&&_f 2 "[CRITICAL] terminal control sequence detected (ANSI/OSC)"
  [[ "$c" =~ [$'\u200b\u200c\u200d\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2060\u2066\u2067\u2068\u2069\ufeff'] ]]&&_f 2 "[CRITICAL] invisible/bidi Unicode control detected"
  [[ "$c" =~ [$'\u2800\u3164\u115f\u1160'] ]]&&_f 1 "[MEDIUM] invisible filler character detected"
- [[ "$lc" =~ (https?://|www\.)[^[:space:]/]*[[:space:]] ]]&& [[ "$c" =~ [^[:ascii:]] ]]&&_f 2 "[CRITICAL] non-ASCII hostname/text in a network command (possible homograph)"
+ [[ "$lc" =~ (https?://|www\.)[^[:space:]/\|\;\&\)\]]+ ]]&& [[ "$c" =~ [^[:ascii:]] ]]&&_f 2 "[CRITICAL] non-ASCII hostname/text in a network command (possible homograph)"
  # Destructive and code-execution patterns.
  [[ "$c" =~ :[[:space:]]*\(\)[[:space:]]*\{[[:space:]]*:[[:space:]]*\|[[:space:]]*:[[:space:]]*\&[[:space:]]*\}[[:space:]]*\;[[:space:]]*: ]]&&_f 2 "[CRITICAL] fork bomb"
  [[ "$lc" =~ (^|[\;\&\|[:space:]])rm[[:space:]]+(-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r|-[rf]+)[a-z]*[[:space:]]+(--[[:space:]]+)?(/|/\*|~|~/|\$home|\.|\.\/\*)([[:space:]]|$) ]]&&_f 2 "[CRITICAL] recursive force deletion targets /, home, or current tree"
