@@ -11,33 +11,28 @@ jobs:
       - name: Install shell integration
         run: sudo bash ./install.sh
 
-      - name: Verify installed native tester
-        run: |
-          command -v arxguard_check
-          test -x /usr/local/bin/arxguard_check
-
       - name: Verify Bash startup
         shell: bash
         run: |
           set -euo pipefail
-          bash -lic 'test "${ARXGUARD_ACTIVE:-}" = 1; command -v arxguard; arxguard status; arxguard test'
-          bash -ic 'test "${ARXGUARD_ACTIVE:-}" = 1; command -v arxguard'
+          bash -lic 'test "${ARXGUARD_ACTIVE:-}" = bash; command -v arxguard; arxguard status; arxguard test'
+          bash -ic 'test "${ARXGUARD_ACTIVE:-}" = bash; command -v arxguard'
 
       - name: Verify Zsh startup
         shell: bash
         run: |
           set -euo pipefail
           zsh --version
-          zsh -lic 'test "${ARXGUARD_ACTIVE:-}" = 1; command -v arxguard; arxguard status; arxguard test'
-          zsh -ic 'test "${ARXGUARD_ACTIVE:-}" = 1; command -v arxguard'
+          zsh -lic 'test "${ARXGUARD_ACTIVE:-}" = zsh; command -v arxguard; arxguard status; arxguard test'
+          zsh -ic 'test "${ARXGUARD_ACTIVE:-}" = zsh; command -v arxguard'
 
       - name: Detection matrix
         shell: bash
         run: |
           set -euo pipefail
-          check_clean() { ./build/arxguard_check -- "$1"; }
-          check_warn() { set +e; ./build/arxguard_check -- "$1"; rc=$?; set -e; test "$rc" -eq 2; }
-          check_block() { set +e; ./build/arxguard_check -- "$1"; rc=$?; set -e; test "$rc" -eq 1; }
+          check_clean() { arxguard check -- "$1" >/dev/null; }
+          check_warn() { set +e; arxguard check -- "$1" >/dev/null 2>&1; rc=$?; set -e; test "$rc" -eq 2; }
+          check_block() { set +e; arxguard check -- "$1" >/dev/null 2>&1; rc=$?; set -e; test "$rc" -eq 1; }
 
           check_clean "printf 'hello world'"
           check_clean "git status --short"
