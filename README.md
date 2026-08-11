@@ -9,14 +9,40 @@ arxguard is an independent, dependency-free pre-execution screen for interactive
 The hot path is native and staged so ordinary commands avoid expensive analysis:
 
 ```text
-Bash
-  -> C Tier-0 byte prefilter (SIMD where available)
+Interactive shell
+  -> native C Tier-0 byte prefilter (SIMD where available)
   -> C Tier-1 command/policy scanner
   -> optional Rust Tier-2 deep analysis
   -> verdict
 ```
 
-Tier-0 is conservative: it only identifies inputs containing bytes that warrant deeper inspection, such as non-ASCII or terminal escape bytes. The SSE2 implementation has a scalar fallback for portability. Tier-1 performs the high-value policy checks without Python, subprocesses, regex engines, network calls, or heap allocation. Rust Tier-2 is reserved for URL/Unicode, obfuscation, and shell-structure signals.
+Tier-0 is conservative: it only identifies inputs containing bytes that warrant deeper inspection, such as non-ASCII or terminal escape bytes. Tier-1 performs the high-value policy checks without Python, subprocesses, regex engines, network calls, or heap allocation. Rust Tier-2 is reserved for URL/Unicode, obfuscation, and shell-structure signals.
+
+## Supported interactive shells
+
+The current installer activates arxguard automatically for **Bash and Zsh**:
+
+- **Bash:** `/etc/profile.d/arxguard.sh` for login shells and `/etc/bash.bashrc` for non-login interactive shells.
+- **Zsh:** `/etc/profile.d/arxguard.sh` for login shells and `/etc/zsh/zshrc` for non-login interactive shells.
+
+The hook loads the native Bash loadable module once per shell process when available, avoiding a separate scanner executable for each command. Zsh uses its native hook integration. Non-interactive shells are intentionally not modified by the global activation file.
+
+Fish, Nushell, and other shells are **not currently claimed as supported**. They should not be described as protected until a dedicated integration exists.
+
+To verify the active shell integration:
+
+```bash
+printf '%s\n' "$ARXGUARD_ACTIVE"
+arxguard status
+```
+
+A newly opened supported interactive terminal should automatically have arxguard active. The detector itself performs no update or network operation when a terminal starts or when a command is scanned.
+
+## ARX distribution and updates
+
+**ARX is the sole authoritative distribution and update layer.** arxguard does not self-update and does not perform `git pull` or contact GitHub during detection.
+
+The ARX-managed installer builds and tests the native payload before installation and records distribution ownership under `/usr/share/arxos/arxguard/manifest`. Updates should be delivered by ARX rather than by a second arxguard updater.
 
 ## Detection layers
 
