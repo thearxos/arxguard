@@ -5,9 +5,16 @@ _arxguard_scan(){
   lc="${lc,,}"
   _f(){ local s="$1"; shift; ((s>worst)) && worst=$s; why+="${why:+$'\n'}$*"; }
   local nonascii=0
-  # Bash cannot prefix the [[ keyword with an environment assignment. Use an
-  # ASCII range instead; it keeps this test in-process and avoids subprocesses.
-  [[ "$c" =~ [^ -~] ]] && nonascii=1
+  # Compare character and byte lengths in-process. A C locale counts bytes,
+  # while the user's locale normally counts characters; a mismatch means the
+  # command contains multibyte/non-ASCII text. No subprocess is spawned.
+  local saved_lc=${LC_ALL-} have_lc=0 char_len byte_len
+  [ -n "${LC_ALL+x}" ] && have_lc=1
+  char_len=${#c}
+  LC_ALL=C
+  byte_len=${#c}
+  if (( have_lc )); then LC_ALL=$saved_lc; else unset LC_ALL; fi
+  (( byte_len != char_len )) && nonascii=1
 
   [[ "$c" == *$'\e['* || "$c" == *$'\e]'* || "$c" == *$'\eP'* ]] && _f 2 "[CRITICAL] terminal control sequence detected (ANSI/OSC)"
   [[ "$c" == *$'\u200b'* || "$c" == *$'\u200c'* || "$c" == *$'\u200d'* || "$c" == *$'\u200e'* || "$c" == *$'\u200f'* || "$c" == *$'\u202a'* || "$c" == *$'\u202b'* || "$c" == *$'\u202c'* || "$c" == *$'\u202d'* || "$c" == *$'\u202e'* || "$c" == *$'\u2060'* || "$c" == *$'\u2066'* || "$c" == *$'\u2067'* || "$c" == *$'\u2068'* || "$c" == *$'\u2069'* || "$c" == *$'\ufeff'* ]] && _f 2 "[CRITICAL] invisible/bidi Unicode control detected"
