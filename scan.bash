@@ -8,7 +8,11 @@ _arxguard_scan(){
  [[ "$c" == *$'\e['* || "$c" == *$'\e]'* || "$c" == *$'\eP'* ]]&&_f 2 "[CRITICAL] terminal control sequence detected (ANSI/OSC)"
  [[ "$c" =~ [$'\u200b\u200c\u200d\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2060\u2066\u2067\u2068\u2069\ufeff'] ]]&&_f 2 "[CRITICAL] invisible/bidi Unicode control detected"
  [[ "$c" =~ [$'\u2800\u3164\u115f\u1160'] ]]&&_f 1 "[MEDIUM] invisible filler character detected"
+ # A Unicode hostname/text in a network command is especially dangerous when
+ # the result is sent directly to a shell. Keep the generic Unicode/network
+ # signal at WARN, but escalate the network-to-shell combination to BLOCK.
  [[ "$lc" =~ (https?://|www\.)[^[:space:]/\|\;\&\)\]]+ ]]&& [[ "$c" =~ [^[:ascii:]] ]]&&_f 2 "[CRITICAL] non-ASCII hostname/text in a network command (possible homograph)"
+ [[ "$lc" =~ (curl|wget|fetch)[[:space:]].*https?:// ]] && [[ "$c" =~ [^[:ascii:]] ]] && [[ "$lc" == *\|* ]] && [[ "$lc" =~ (bash|zsh|dash|ksh|csh|sh)([[:space:]]|$) ]] && _f 2 "[CRITICAL] non-ASCII network content piped into a shell (possible homograph)"
  # Destructive and code-execution patterns.
  [[ "$c" =~ :[[:space:]]*\(\)[[:space:]]*\{[[:space:]]*:[[:space:]]*\|[[:space:]]*:[[:space:]]*\&[[:space:]]*\}[[:space:]]*\;[[:space:]]*: ]]&&_f 2 "[CRITICAL] fork bomb"
  [[ "$lc" =~ (^|[\;\&\|[:space:]])rm[[:space:]]+(-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r|-[rf]+)[a-z]*[[:space:]]+(--[[:space:]]+)?(/|/\*|~|~/|\$home|\.|\.\/\*)([[:space:]]|$) ]]&&_f 2 "[CRITICAL] recursive force deletion targets /, home, or current tree"
@@ -19,7 +23,10 @@ _arxguard_scan(){
  # download-to-interpreter command at WARN. Homograph/network combinations are
  # already escalated above; shell-command chaining and stdout-forcing downloads
  # receive the additional execution-boundary signal here.
- [[ "$lc" =~ (curl|wget|fetch)[[:space:]].*https?://.*\|[[:space:]]*(sudo[[:space:]]+)?(ba|z|da|c|k)?sh[[:space:]]+-c([[:space:]]|$) || "$lc" =~ (curl|wget|fetch)[[:space:]].*(-O[[:space:]]*-|--output-document[=[:space:]]*-).*\|[[:space:]]*(sudo[[:space:]]+)?(ba|z|da|c|k)?sh([[:space:]]|$) ]]&&_f 2 "[CRITICAL] suspicious remote content piped into shell"
+ if [[ "$lc" =~ (curl|wget|fetch)[[:space:]].*https?://.*\|[[:space:]]*(sudo[[:space:]]+)?(ba|z|da|c|k)?sh[[:space:]]+-c([[:space:]]|$) ]] || \
+    [[ "$lc" =~ (curl|wget|fetch)[[:space:]].*(-O[[:space:]]*-|--output-document[=[:space:]]*-).*\|[[:space:]]*(sudo[[:space:]]+)?(ba|z|da|c|k)?sh([[:space:]]|$) ]]; then
+   _f 2 "[CRITICAL] suspicious remote content piped into shell"
+ fi
  [[ "$lc" =~ (bash|sh|zsh)[[:space:]]+-i[[:space:]].*(/dev/tcp/|/dev/udp/) || "$lc" =~ (/dev/tcp/|/dev/udp/)[0-9a-z.:_-]+[[:space:]]*(0?<&1|<&|>&)[[:space:]]*[0-9] ]]&&_f 2 "[CRITICAL] reverse shell via raw socket"
  [[ "$lc" =~ (^|[[:space:]\|\&;])(nc|ncat)[[:space:]].*-e[[:space:]]+[^[:space:]]*sh || "$lc" =~ socat[[:space:]].*exec[:=] || "$lc" =~ mkfifo[[:space:]].*\|[[:space:]]*(ba|z|c|k)?sh ]]&&_f 2 "[CRITICAL] network-to-shell reverse shell pattern"
  [[ "$lc" =~ (python[0-9]?|perl|ruby|php)[[:space:]].*socket.*(/bin/(ba)?sh|pty\.spawn|exec[lv]) ]]&&_f 2 "[CRITICAL] interpreter opens socket into shell"
