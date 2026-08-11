@@ -1,0 +1,17 @@
+name: scanner-preflight
+on:
+  push:
+  pull_request:
+jobs:
+  scanner-preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and install
+        run: sudo bash ./install.sh
+      - name: Validate scanner source
+        run: |
+          set -euo pipefail
+          bash -n /usr/share/arxguard/scan.bash
+          bash -c 'source /usr/share/arxguard/scan.bash; declare -F _arxguard_scan'
+          bash -c 'source /usr/share/arxguard/scan.bash; _arxguard_scan "ls -la"; test $? -eq 0'
