@@ -5,9 +5,6 @@ _arxguard_scan(){
   lc="${lc,,}"
   _f(){ local s="$1"; shift; ((s>worst)) && worst=$s; why+="${why:+$'\n'}$*"; }
   local nonascii=0
-  # Compare character and byte lengths in-process. A C locale counts bytes,
-  # while the user's locale normally counts characters; a mismatch means the
-  # command contains multibyte/non-ASCII text. No subprocess is spawned.
   local saved_lc=${LC_ALL-} have_lc=0 char_len byte_len
   [ -n "${LC_ALL+x}" ] && have_lc=1
   char_len=${#c}
@@ -33,14 +30,16 @@ _arxguard_scan(){
   if [[ "$lc" == *"base64 -d"*"|"*"sh"* || "$lc" == *"base64 --decode"*"|"*"sh"* || "$lc" == *"xxd -r"*"|"*"sh"* || "$lc" == *"openssl enc -d"*"|"*"sh"* ]]; then
     _f 2 "[CRITICAL] decoded payload piped into a shell"
   fi
-  if [[ "$lc" == curl* || "$lc" == wget* || "$lc" == fetch* ]] && [[ "$lc" == *"| sudo bash"* || "$lc" == *"| sudo sh"* || "$lc" == *"| sudo zsh"* ]]; then
+  if [[ "$lc" == curl* || "$lc" == wget* || "$lc" == fetch* ]] && [[ "$lc" == *"| sudo bash"* || "$lc" == *"| sudo sh"* || "$lc" == *"| sudo zsh"* || "$lc" == *"| sudo dash"* || "$lc" == *"| sudo ksh"* ]]; then
     _f 2 "[CRITICAL] remote script piped into root shell"
   fi
 
   if [[ "$lc" == curl* || "$lc" == wget* || "$lc" == fetch* ]] && [[ "$lc" == *"http://"* || "$lc" == *"https://"* ]]; then
-    if [[ "$lc" == *"| sh -c "* || "$lc" == *"| bash -c "* || "$lc" == *"| zsh -c "* || "$lc" == *"| dash -c "* || "$lc" == *"| ksh -c "*" || "$lc" == *" -O- | sh"* || "$lc" == *" -O- | bash"* || "$lc" == *" -O- | zsh"* || "$lc" == *" -O- | dash"* || "$lc" == *" -O- | ksh"* || "$lc" == *" --output-document=- | sh"* || "$lc" == *" --output-document=- | bash"* || "$lc" == *" --output-document=- | zsh"* ]]; then
-      _f 2 "[CRITICAL] suspicious remote content piped into shell"
-    fi
+    case "$lc" in
+      *"| sh -c "*|*"| bash -c "*|*"| zsh -c "*|*"|*"| dash -c "*"|*"| ksh -c "*"|*" -O- | sh"*|*" -O- | bash"*|*" -O- | zsh"*|*" -O- | dash"*|*" -O- | ksh"*|*" --output-document=- | sh"*|*" --output-document=- | bash"*|*" --output-document=- | zsh"*)
+        _f 2 "[CRITICAL] suspicious remote content piped into shell"
+        ;;
+    esac
   fi
 
   [[ "$lc" == *"/dev/tcp/"* || "$lc" == *"/dev/udp/"* ]] && _f 2 "[CRITICAL] reverse shell via raw socket"
