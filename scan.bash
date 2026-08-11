@@ -12,7 +12,12 @@ _arxguard_scan(){
  # the result is sent directly to a shell. Keep the generic Unicode/network
  # signal at WARN, but escalate the network-to-shell combination to BLOCK.
  [[ "$lc" =~ (https?://|www\.)[^[:space:]/\|\;\&\)\]]+ ]]&& [[ "$c" =~ [^[:ascii:]] ]]&&_f 2 "[CRITICAL] non-ASCII hostname/text in a network command (possible homograph)"
- [[ "$lc" =~ (curl|wget|fetch)[[:space:]].*https?:// ]] && [[ "$c" =~ [^[:ascii:]] ]] && [[ "$lc" == *\|* ]] && [[ "$lc" =~ (bash|zsh|dash|ksh|csh|sh)([[:space:]]|$) ]] && _f 2 "[CRITICAL] non-ASCII network content piped into a shell (possible homograph)"
+ if [[ "$c" =~ [^[:ascii:]] ]] &&
+    [[ "$lc" =~ (https?://|www\.) ]] &&
+    [[ "$lc" == *\|* ]] &&
+    [[ "$lc" =~ (bash|zsh|dash|ksh|csh|sh)([[:space:]]|$) ]]; then
+   _f 2 "[CRITICAL] non-ASCII network content piped into a shell (possible homograph)"
+ fi
  # Destructive and code-execution patterns.
  [[ "$c" =~ :[[:space:]]*\(\)[[:space:]]*\{[[:space:]]*:[[:space:]]*\|[[:space:]]*:[[:space:]]*\&[[:space:]]*\}[[:space:]]*\;[[:space:]]*: ]]&&_f 2 "[CRITICAL] fork bomb"
  [[ "$lc" =~ (^|[\;\&\|[:space:]])rm[[:space:]]+(-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r|-[rf]+)[a-z]*[[:space:]]+(--[[:space:]]+)?(/|/\*|~|~/|\$home|\.|\.\/\*)([[:space:]]|$) ]]&&_f 2 "[CRITICAL] recursive force deletion targets /, home, or current tree"
