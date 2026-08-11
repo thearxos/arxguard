@@ -47,6 +47,7 @@ if(BASH_INCLUDE_DIR)
 endif()
 
 install(TARGETS arxguard_engine_shared LIBRARY DESTINATION lib)
+install(TARGETS arxguard_check RUNTIME DESTINATION bin)
 install(FILES src/arxguard_engine.h src/arxguard_simd.h DESTINATION include/arxguard)
 if(TARGET arxguard_native)
   install(TARGETS arxguard_native LIBRARY DESTINATION lib/arxguard)
