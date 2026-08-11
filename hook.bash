@@ -11,15 +11,11 @@ _ARXGUARD_BASH_LOADED=1
 _ARXGUARD_NATIVE="${ARXGUARD_NATIVE:-$ARXGUARD_LIB/arxguard_native/arxguard_native.so}"
 _ARXGUARD_NATIVE_LOADED=0
 
-# Load the native engine once into the current Bash process.
 if [[ -r "$_ARXGUARD_NATIVE" ]] && enable -f "$_ARXGUARD_NATIVE" arxguard_native 2>/dev/null; then
   _ARXGUARD_NATIVE_LOADED=1
 else
-  # Compatibility fallback for installations that have not built the native module.
   source "$ARXGUARD_LIB/scan.bash" 2>/dev/null || return 0
 fi
-
-shopt -s extdebug 2>/dev/null
 
 _arxguard_scan_native() {
   local c="$1"
@@ -61,8 +57,12 @@ _arxguard_preexec() {
   return 0
 }
 
-_arxguard_prev_debug="$(trap -p DEBUG 2>/dev/null | sed "s/^trap -- '//;s/' DEBUG\$//")"
-if [[ -n "$_arxguard_prev_debug" && "$_arxguard_prev_debug" != *_arxguard_preexec* ]]; then
+# Preserve an existing DEBUG trap without spawning sed/awk/grep. Bash's
+# trap -p output is stable and can be normalized with shell parameter expansion.
+_arxguard_prev_debug="$(trap -p DEBUG 2>/dev/null)"
+if [[ -n "$_arxguard_prev_debug" && "$_arxguard_prev_debug" != *'_arxguard_preexec'* ]]; then
+  _arxguard_prev_debug=${_arxguard_prev_debug#trap -- \'}
+  _arxguard_prev_debug=${_arxguard_prev_debug%\' DEBUG}
   trap "${_arxguard_prev_debug}; _arxguard_preexec" DEBUG
 else
   trap '_arxguard_preexec' DEBUG
