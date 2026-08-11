@@ -15,8 +15,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bash -lic 'test "${ARXGUARD_ACTIVE:-}" = bash; command -v arxguard; arxguard status; arxguard test'
-          bash -ic 'test "${ARXGUARD_ACTIVE:-}" = bash; command -v arxguard'
+          bash -lic 'test "${ARXGUARD_ACTIVE:-}" = bash; test "$(type -t arxguard_native)" = builtin; command -v arxguard; arxguard status; arxguard test'
+          bash -ic 'test "${ARXGUARD_ACTIVE:-}" = bash; test "$(type -t arxguard_native)" = builtin; command -v arxguard'
 
       - name: Verify Zsh startup
         shell: bash
