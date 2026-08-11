@@ -29,8 +29,8 @@ _arxguard_scan(){
  # download-to-interpreter command at WARN. Homograph/network combinations are
  # already escalated above; shell-command chaining and stdout-forcing downloads
  # receive the additional execution-boundary signal here.
- if [[ "$lc" == *"| sh -c "* || "$lc" == *"| bash -c "* || "$lc" == *"| zsh -c "* || "$lc" == *"| dash -c "* || "$lc" == *"| ksh -c "*" || \
-    [[ "$lc" == *" -O- | sh"* || "$lc" == *" -O- | bash"* || "$lc" == *" -O- | zsh"* || "$lc" == *" -O- | dash"* || "$lc" == *" -O- | ksh"* || \
+ if [[ "$lc" == *"| sh -c "* || "$lc" == *"| bash -c "* || "$lc" == *"| zsh -c "* || "$lc" == *"| dash -c "* || "$lc" == *"| ksh -c "*" ]] ||
+    [[ "$lc" == *" -O- | sh"* || "$lc" == *" -O- | bash"* || "$lc" == *" -O- | zsh"* || "$lc" == *" -O- | dash"* || "$lc" == *" -O- | ksh"* ]] ||
     [[ "$lc" == *" --output-document=- | sh"* || "$lc" == *" --output-document=- | bash"* || "$lc" == *" --output-document=- | zsh"* ]]; then
    if [[ "$lc" == curl* || "$lc" == wget* || "$lc" == fetch* ]] && [[ "$lc" == *"http://"* || "$lc" == *"https://"* ]]; then
      _f 2 "[CRITICAL] suspicious remote content piped into shell"
