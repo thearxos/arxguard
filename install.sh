@@ -19,13 +19,9 @@ need_cmd cmake
 need_cmd cc
 need_cmd ctest
 
-# ARX may provide these when installing a versioned artifact. Defaults keep
-# this payload installer usable by the ARX build/test pipeline without inventing
-# a second updater or requiring network access.
 ARX_CHANNEL="${ARX_CHANNEL:-arx}"
 ARX_VERSION="${ARX_VERSION:-unknown}"
 ARX_ARTIFACT="${ARX_ARTIFACT:-arxguard}"
-ARX_MANAGED=1
 
 case "$ARX_CHANNEL" in
   arx) ;;
@@ -38,11 +34,8 @@ cmake -S "$D" -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release
 cmake --build "$BUILD_DIR" --parallel
 ctest --test-dir "$BUILD_DIR" --output-on-failure
 
-# Native installation happens only after the complete test suite succeeds.
 $S cmake --install "$BUILD_DIR"
 
-# Record distribution ownership separately from the runtime. The detector does
-# not read this file and never performs update/network work during scanning.
 $S install -d /usr/share/arxos/arxguard
 $S sh -c 'cat > /usr/share/arxos/arxguard/manifest <<EOF
 managed_by=arx
@@ -55,16 +48,16 @@ EOF'
 
 $S install -Dm644 "$D/scan.bash" /usr/share/arxguard/scan.bash
 $S install -Dm644 "$D/hook.bash" /usr/share/arxguard/hook.bash
-$S install -Dm644 "$D/hook.zsh"  /usr/share/arxguard/hook.zsh
-$S install -Dm755 "$D/arxguard"  /usr/local/bin/arxguard
+$S install -Dm644 "$D/hook.zsh" /usr/share/arxguard/hook.zsh
+$S install -Dm755 "$D/arxguard" /usr/local/bin/arxguard
 
-# Install the native VM/test helper when it was built by the current tree.
 if [ -x "$BUILD_DIR/arxguard_check" ]; then
   $S install -Dm755 "$BUILD_DIR/arxguard_check" /usr/local/bin/arxguard_check
 fi
 
-# Activate for every interactive shell. profile.d covers login shells;
-# bash/zsh rc files cover non-login interactive shells.
+# Ensure ARXGuard is loaded automatically for interactive Bash and Zsh.
+# Login shells use /etc/profile.d; non-login Bash uses /etc/bash.bashrc;
+# Zsh uses /etc/zsh/zshrc. Detection remains local/native at runtime.
 $S install -Dm644 "$D/arxguard.sh" /etc/profile.d/arxguard.sh
 
 _wire() {
@@ -83,5 +76,6 @@ fi
 
 echo "arxguard installed — ARX-managed native engine built and tests passed."
 echo "distribution: ARX ($ARX_VERSION)"
+echo "interactive shells: Bash + Zsh enabled"
 echo "updates: ARX only"
 echo "Self-test: arxguard test"
