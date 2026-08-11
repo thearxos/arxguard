@@ -5,7 +5,9 @@ _arxguard_scan(){
   lc="${lc,,}"
   _f(){ local s="$1"; shift; ((s>worst)) && worst=$s; why+="${why:+$'\n'}$*"; }
   local nonascii=0
-  if LC_ALL=C [[ "$c" =~ [^[:print:]] ]]; then nonascii=1; fi
+  # Bash cannot prefix the [[ keyword with an environment assignment. Use an
+  # ASCII range instead; it keeps this test in-process and avoids subprocesses.
+  [[ "$c" =~ [^ -~] ]] && nonascii=1
 
   [[ "$c" == *$'\e['* || "$c" == *$'\e]'* || "$c" == *$'\eP'* ]] && _f 2 "[CRITICAL] terminal control sequence detected (ANSI/OSC)"
   [[ "$c" == *$'\u200b'* || "$c" == *$'\u200c'* || "$c" == *$'\u200d'* || "$c" == *$'\u200e'* || "$c" == *$'\u200f'* || "$c" == *$'\u202a'* || "$c" == *$'\u202b'* || "$c" == *$'\u202c'* || "$c" == *$'\u202d'* || "$c" == *$'\u202e'* || "$c" == *$'\u2060'* || "$c" == *$'\u2066'* || "$c" == *$'\u2067'* || "$c" == *$'\u2068'* || "$c" == *$'\u2069'* || "$c" == *$'\ufeff'* ]] && _f 2 "[CRITICAL] invisible/bidi Unicode control detected"
