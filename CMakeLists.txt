@@ -20,6 +20,11 @@ target_link_libraries(arxguard_native_tests PRIVATE arxguard_engine)
 target_include_directories(arxguard_native_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 add_test(NAME arxguard_native_vectors COMMAND arxguard_native_tests)
 
+add_executable(arxguard_v4_quality tests/test_engine_v4.c)
+target_link_libraries(arxguard_v4_quality PRIVATE arxguard_engine)
+target_include_directories(arxguard_v4_quality PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+add_test(NAME arxguard_v4_quality COMMAND arxguard_v4_quality)
+
 add_executable(arxguard_native_bench bench/native_bench.c)
 target_link_libraries(arxguard_native_bench PRIVATE arxguard_engine)
 target_compile_options(arxguard_native_bench PRIVATE -O3)
