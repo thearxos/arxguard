@@ -1,0 +1,35 @@
+name: native-hardening
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  asan-ubsan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_FLAGS='-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer'
+      - name: Build
+        run: cmake --build build --parallel
+      - name: Test
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: ctest --test-dir build --output-on-failure
+
+  fuzz-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build libFuzzer target
+        run: |
+          cc -std=c11 -O1 -g -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer \
+            -Isrc tests/fuzz_native.c src/arxguard_engine.c src/arxguard_simd.c \
+            -o arxguard-fuzz
+      - name: Smoke fuzz
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1
+        run: ./arxguard-fuzz -max_total_time=15 -print_final_stats=1
