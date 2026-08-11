@@ -17,7 +17,7 @@ _arxguard_scan(){
  [[ "$lc" =~ (curl|wget|fetch|http)[[:space:]].*\|[[:space:]]*sudo[[:space:]]+(ba|z|da|c|k)?sh ]]&&_f 2 "[CRITICAL] remote script piped into root shell"
  # Escalate the combined high-risk signal: non-ASCII network content piped directly into a shell.
  # This is additive; ordinary download-to-shell remains governed by the WARN rule below.
- [[ "$lc" =~ (curl|wget|fetch)[[:space:]].*https?://.*\|[[:space:]]*(sudo[[:space:]]+)?(ba|z|da|c|k)?sh([[:space:]]|$) ]] && [[ "$c" == *[!$'\x01'-\x7f']* ]] && _f 2 "[CRITICAL] homograph/IDN network content piped into shell"
+ [[ "$lc" =~ (curl|wget|fetch)[[:space:]].*https?://.*\|[[:space:]]*(sudo[[:space:]]+)?(ba|z|da|c|k)?sh([[:space:]]|$) ]] && [[ "$c" =~ [^[:ascii:]] ]] && _f 2 "[CRITICAL] homograph/IDN network content piped into shell"
  [[ "$lc" =~ (bash|sh|zsh)[[:space:]]+-i[[:space:]].*(/dev/tcp/|/dev/udp/) || "$lc" =~ (/dev/tcp/|/dev/udp/)[0-9a-z.:_-]+[[:space:]]*(0?<&1|<&|>&)[[:space:]]*[0-9] ]]&&_f 2 "[CRITICAL] reverse shell via raw socket"
  [[ "$lc" =~ (^|[[:space:]\|\&;])(nc|ncat)[[:space:]].*-e[[:space:]]+[^[:space:]]*sh || "$lc" =~ socat[[:space:]].*exec[:=] || "$lc" =~ mkfifo[[:space:]].*\|[[:space:]]*(ba|z|c|k)?sh ]]&&_f 2 "[CRITICAL] network-to-shell reverse shell pattern"
  [[ "$lc" =~ (python[0-9]?|perl|ruby|php)[[:space:]].*socket.*(/bin/(ba)?sh|pty\.spawn|exec[lv]) ]]&&_f 2 "[CRITICAL] interpreter opens socket into shell"
