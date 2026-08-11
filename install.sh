@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# arxguard installer — ARXOS zero-trust command guard.
-# Builds and validates the native engine before installing shell integration.
+# arxguard installer — ARX-managed payload installer.
+# ARX is the sole distribution/update authority. This script only builds,
+# validates, and installs the payload supplied by ARX; it never self-updates.
 set -euo pipefail
 
 D="$(cd "$(dirname "$0")" && pwd)"
@@ -18,16 +19,39 @@ need_cmd cmake
 need_cmd cc
 need_cmd ctest
 
+# ARX may provide these when installing a versioned artifact. Defaults keep
+# this payload installer usable by the ARX build/test pipeline without inventing
+# a second updater or requiring network access.
+ARX_CHANNEL="${ARX_CHANNEL:-arx}"
+ARX_VERSION="${ARX_VERSION:-unknown}"
+ARX_ARTIFACT="${ARX_ARTIFACT:-arxguard}"
+ARX_MANAGED=1
+
+case "$ARX_CHANNEL" in
+  arx) ;;
+  *) echo "error: arxguard must be installed through the ARX distribution channel" >&2; exit 1 ;;
+esac
+
 BUILD_DIR="$D/build"
 
 cmake -S "$D" -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release
 cmake --build "$BUILD_DIR" --parallel
 ctest --test-dir "$BUILD_DIR" --output-on-failure
 
-# Install the native shared engine and headers through CMake. Keep this
-# separate from shell integration so a native build/test failure never leaves
-# an apparently installed but unvalidated guard.
+# Native installation happens only after the complete test suite succeeds.
 $S cmake --install "$BUILD_DIR"
+
+# Record distribution ownership separately from the runtime. The detector does
+# not read this file and never performs update/network work during scanning.
+$S install -d /usr/share/arxos/arxguard
+$S sh -c 'cat > /usr/share/arxos/arxguard/manifest <<EOF
+managed_by=arx
+channel=$ARX_CHANNEL
+artifact=$ARX_ARTIFACT
+version=$ARX_VERSION
+updates=arx-only
+runtime_network=disabled
+EOF'
 
 $S install -Dm644 "$D/scan.bash" /usr/share/arxguard/scan.bash
 $S install -Dm644 "$D/hook.bash" /usr/share/arxguard/hook.bash
@@ -57,5 +81,7 @@ if [ -d /etc/zsh ]; then
   _wire /etc/zsh/zshrc /usr/share/arxguard/hook.zsh
 fi
 
-echo "arxguard installed — native engine built and tests passed."
+echo "arxguard installed — ARX-managed native engine built and tests passed."
+echo "distribution: ARX ($ARX_VERSION)"
+echo "updates: ARX only"
 echo "Self-test: arxguard test"
