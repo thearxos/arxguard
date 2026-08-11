@@ -8,18 +8,19 @@ _arxguard_scan(){
  [[ "$c" == *$'\e['* || "$c" == *$'\e]'* || "$c" == *$'\eP'* ]]&&_f 2 "[CRITICAL] terminal control sequence detected (ANSI/OSC)"
  [[ "$c" =~ [$'\u200b\u200c\u200d\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2060\u2066\u2067\u2068\u2069\ufeff'] ]]&&_f 2 "[CRITICAL] invisible/bidi Unicode control detected"
  [[ "$c" =~ [$'\u2800\u3164\u115f\u1160'] ]]&&_f 1 "[MEDIUM] invisible filler character detected"
- # A Unicode hostname/text in a network command is especially dangerous when
- # the result is sent directly to a shell. Keep the generic Unicode/network
- # signal at WARN, but escalate the network-to-shell combination to BLOCK.
- [[ "$lc" =~ (https?://|www\.)[^[:space:]/\|\;\&\)\]]+ ]]&& [[ "$c" =~ [^[:ascii:]] ]]&&_f 2 "[CRITICAL] non-ASCII hostname/text in a network command (possible homograph)"
- if [[ "$c" =~ [^[:ascii:]] ]] &&
-    [[ "$lc" =~ (https?://|www\.) ]] &&
-    [[ "$lc" == *\|* ]] &&
-    [[ "$lc" =~ (bash|zsh|dash|ksh|csh|sh)([[:space:]]|$) ]]; then
+ # Use C-locale byte matching for non-ASCII detection. This avoids relying on
+ # locale-specific regex character classes and keeps the hot path in-process.
+ if [[ "$lc" =~ (https?://|www\.)[^[:space:]/\|\;\&\)\]]+ ]]&& [[ "$c" == *[!$'\x00'-$'\x7f']* ]]; then
+   _f 2 "[CRITICAL] non-ASCII hostname/text in a network command (possible homograph)"
+ fi
+ if [[ "$c" == *[!$'\x00'-$'\x7f']* ]] &&
+    [[ "$lc" == *"http://"* || "$lc" == *"https://"* || "$lc" == *"www."* ]] &&
+    [[ "$lc" == *"|"* ]] &&
+    [[ "$lc" == *" bash"* || "$lc" == *" sh"* || "$lc" == *" zsh"* || "$lc" == *" dash"* || "$lc" == *" ksh"* || "$lc" == *" csh"* ]]; then
    _f 2 "[CRITICAL] non-ASCII network content piped into a shell (possible homograph)"
  fi
  # Destructive and code-execution patterns.
- [[ "$c" =~ :[[:space:]]*\(\)[[:space:]]*\{[[:space:]]*:[[:space:]]*\|[[:space:]]*:[[:space:]]*\&[[:space:]]*\}[[:space:]]*\;[[:space:]]*: ]]&&_f 2 "[CRITICAL] fork bomb"
+ [[ "$lc" =~ :[[:space:]]*\(\)[[:space:]]*\{[[:space:]]*:[[:space:]]*\|[[:space:]]*:[[:space:]]*\&[[:space:]]*\}[[:space:]]*\;[[:space:]]*: ]]&&_f 2 "[CRITICAL] fork bomb"
  [[ "$lc" =~ (^|[\;\&\|[:space:]])rm[[:space:]]+(-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r|-[rf]+)[a-z]*[[:space:]]+(--[[:space:]]+)?(/|/\*|~|~/|\$home|\.|\.\/\*)([[:space:]]|$) ]]&&_f 2 "[CRITICAL] recursive force deletion targets /, home, or current tree"
  [[ "$lc" =~ (dd[[:space:]].*of=/dev/(sd|nvme|vd|mmcblk|disk)|mkfs(\.[a-z0-9]+)?[[:space:]]+/dev/|wipefs[[:space:]]|>[[:space:]]*/dev/(sd|nvme|vd)) ]]&&_f 2 "[CRITICAL] raw disk write or format"
  [[ "$lc" =~ (base64[[:space:]]+(-d|--decode)|xxd[[:space:]]+-r|openssl[[:space:]]+enc[[:space:]]+-d).*\|[[:space:]]*(sudo[[:space:]]+)?(ba|z|da|c|k)?sh([[:space:]]|$) ]]&&_f 2 "[CRITICAL] decoded payload piped into a shell"
@@ -28,9 +29,12 @@ _arxguard_scan(){
  # download-to-interpreter command at WARN. Homograph/network combinations are
  # already escalated above; shell-command chaining and stdout-forcing downloads
  # receive the additional execution-boundary signal here.
- if [[ "$lc" =~ (curl|wget|fetch)[[:space:]].*https?://.*\|[[:space:]]*(sudo[[:space:]]+)?(ba|z|da|c|k)?sh[[:space:]]+-c([[:space:]]|$) ]] || \
-    [[ "$lc" =~ (curl|wget|fetch)[[:space:]].*(-O[[:space:]]*-|--output-document[=[:space:]]*-).*\|[[:space:]]*(sudo[[:space:]]+)?(ba|z|da|c|k)?sh([[:space:]]|$) ]]; then
-   _f 2 "[CRITICAL] suspicious remote content piped into shell"
+ if [[ "$lc" == *"| sh -c "* || "$lc" == *"| bash -c "* || "$lc" == *"| zsh -c "* || "$lc" == *"| dash -c "* || "$lc" == *"| ksh -c "*" || \
+    [[ "$lc" == *" -O- | sh"* || "$lc" == *" -O- | bash"* || "$lc" == *" -O- | zsh"* || "$lc" == *" -O- | dash"* || "$lc" == *" -O- | ksh"* || \
+    [[ "$lc" == *" --output-document=- | sh"* || "$lc" == *" --output-document=- | bash"* || "$lc" == *" --output-document=- | zsh"* ]]; then
+   if [[ "$lc" == curl* || "$lc" == wget* || "$lc" == fetch* ]] && [[ "$lc" == *"http://"* || "$lc" == *"https://"* ]]; then
+     _f 2 "[CRITICAL] suspicious remote content piped into shell"
+   fi
  fi
  [[ "$lc" =~ (bash|sh|zsh)[[:space:]]+-i[[:space:]].*(/dev/tcp/|/dev/udp/) || "$lc" =~ (/dev/tcp/|/dev/udp/)[0-9a-z.:_-]+[[:space:]]*(0?<&1|<&|>&)[[:space:]]*[0-9] ]]&&_f 2 "[CRITICAL] reverse shell via raw socket"
  [[ "$lc" =~ (^|[[:space:]\|\&;])(nc|ncat)[[:space:]].*-e[[:space:]]+[^[:space:]]*sh || "$lc" =~ socat[[:space:]].*exec[:=] || "$lc" =~ mkfifo[[:space:]].*\|[[:space:]]*(ba|z|c|k)?sh ]]&&_f 2 "[CRITICAL] network-to-shell reverse shell pattern"
