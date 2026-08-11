@@ -1,5 +1,6 @@
 #include "arxguard_simd.h"
 #include <stddef.h>
+#include <stdatomic.h>
 #if defined(__x86_64__) || defined(__i386__)
 #include <immintrin.h>
 #endif
@@ -18,11 +19,10 @@ static int scalar_prefilter(const unsigned char *p, size_t n) {
 #if defined(__x86_64__) || defined(__i386__)
 __attribute__((target("sse2")))
 static int sse2_prefilter(const unsigned char *p, size_t n) {
-    const __m128i zero = _mm_setzero_si128();
     const __m128i esc = _mm_set1_epi8(0x1b);
     while (n >= 16) {
         __m128i v = _mm_loadu_si128((const __m128i*)p);
-        if (_mm_movemask_epi8(_mm_cmplt_epi8(v, zero)) ||
+        if (_mm_movemask_epi8(v) ||
             _mm_movemask_epi8(_mm_cmpeq_epi8(v, esc))) return 1;
         p += 16; n -= 16;
     }
@@ -36,7 +36,7 @@ static int avx2_prefilter(const unsigned char *p, size_t n) {
     const __m256i esc = _mm256_set1_epi8(0x1b);
     while (n >= 32) {
         __m256i v = _mm256_loadu_si256((const __m256i*)p);
-        if (_mm256_movemask_epi8(_mm256_cmplt_epi8(v, zero)) ||
+        if (_mm256_movemask_epi8(_mm256_cmpgt_epi8(zero, v)) ||
             _mm256_movemask_epi8(_mm256_cmpeq_epi8(v, esc))) return 1;
         p += 32; n -= 32;
     }
@@ -74,13 +74,16 @@ static arxguard_prefilter_fn select_prefilter(void) {
 }
 
 static arxguard_prefilter_fn arxguard_prefilter_impl(void) {
-    static arxguard_prefilter_fn fn;
-    static int initialized;
-    if (!initialized) {
-        fn = select_prefilter();
-        initialized = 1;
+    static _Atomic(arxguard_prefilter_fn) fn = ATOMIC_VAR_INIT(NULL);
+    arxguard_prefilter_fn selected = atomic_load_explicit(&fn, memory_order_acquire);
+    if (selected) return selected;
+    selected = select_prefilter();
+    arxguard_prefilter_fn expected = NULL;
+    if (!atomic_compare_exchange_strong_explicit(&fn, &expected, selected,
+            memory_order_release, memory_order_relaxed)) {
+        selected = expected;
     }
-    return fn;
+    return selected;
 }
 
 int arxguard_prefilter_bytes(const unsigned char *p, size_t n) {
