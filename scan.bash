@@ -42,6 +42,6 @@ _arxguard_scan(){
 _arxguard_scan_file(){
  local file="$1" line n=0 rc=0 rc_line out
  [ -f "$file" ]||{ printf '[ERROR] file not found: %s\n' "$file";return 2; }
- while IFS= read -r line||[ -n "$line" ];do n=$((n+1));out="$(_arxguard_scan "$line")";rc_line=$?;[ -n "$out" ]&&printf 'line %d: %s\n' "$n: $out";[ "$rc_line" -gt "$rc" ]&&rc=$rc_line;done<"$file"
+ while IFS= read -r line||[ -n "$line" ];do n=$((n+1));out="$(_arxguard_scan "$line")";rc_line=$?;[ -n "$out" ]&&printf 'line %d: %s\n' "$n" "$out";[ "$rc_line" -gt "$rc" ]&&rc=$rc_line;done<"$file"
  return "$rc"
 }
