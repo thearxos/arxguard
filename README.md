@@ -70,3 +70,9 @@ ctest --test-dir build --output-on-failure
 The benchmark reports nanoseconds per scan and, on x86, approximate CPU cycles per scan. Benchmark numbers are machine- and load-dependent and should be compared on the same runner. A libFuzzer entry point is provided at `tests/fuzz_engine.c`; it is intentionally not part of the normal production build.
 
 The scanner stays on the native hot path without a Bash detection parser or Python dependency. Regression vectors live under `tests/`, including independent cases for terminal injection, package-signature bypass, reverse shells, insecure downloads, environment hijacking and cloud metadata access.
+
+---
+
+<div align="center">
+<sub><b>arxguard</b> is part of the <b>ArxOS</b> project, built by <b>Stingray Labs</b>.</sub>
+</div>
