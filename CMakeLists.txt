@@ -41,7 +41,9 @@ target_include_directories(arxguard_check PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/sr
 find_path(BASH_INCLUDE_DIR builtins.h PATHS /usr/include/bash /usr/local/include/bash)
 if(BASH_INCLUDE_DIR)
   add_library(arxguard_native SHARED src/arxguard_builtin.c ${ARXGUARD_NATIVE_SOURCES})
-  target_include_directories(arxguard_native PRIVATE ${BASH_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/src)
+  # bash's command.h does #include "stdc.h", which ships under bash/include/, so that subdir
+  # must be on the path too or the loadable-builtin target fails to compile.
+  target_include_directories(arxguard_native PRIVATE ${BASH_INCLUDE_DIR} ${BASH_INCLUDE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/src)
   target_compile_options(arxguard_native PRIVATE -O3 -fno-plt -fvisibility=hidden)
   set_target_properties(arxguard_native PROPERTIES PREFIX "" OUTPUT_NAME arxguard_native)
 endif()

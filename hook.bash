@@ -17,16 +17,33 @@ elif [[ -r "$ARXGUARD_LIB/arxguard_native.so" ]]; then
   _ARXGUARD_NATIVE="$ARXGUARD_LIB/arxguard_native.so"
 fi
 
+# Locate the always-installed CLI engine, used as a fallback when the in-process loadable
+# builtin cannot be enabled (e.g. a bash built without dynamic-loading support, or a minimal
+# install). Same engine, one fork per command — slower, but the guard NEVER silently goes dark.
+if [[ -z "${ARXGUARD_CHECK:-}" ]]; then
+  for _c in /usr/local/bin/arxguard_check /usr/bin/arxguard_check "$ARXGUARD_LIB/arxguard_check"; do
+    [[ -x "$_c" ]] && { ARXGUARD_CHECK="$_c"; break; }
+  done
+fi
+
 if [[ -n "${_ARXGUARD_NATIVE:-}" ]] && [[ -r "$_ARXGUARD_NATIVE" ]] && enable -f "$_ARXGUARD_NATIVE" arxguard_native 2>/dev/null; then
   _ARXGUARD_NATIVE_LOADED=1
+  _ARXGUARD_MODE=bash
+  _arxguard_scan_native() { arxguard_native "$1"; }
+elif [[ -n "${ARXGUARD_CHECK:-}" ]] && [[ -x "$ARXGUARD_CHECK" ]]; then
+  _ARXGUARD_MODE=bash-fallback
+  # Strip the exe's "STATUS findings=N" header so only the reasons reach the block/warn display;
+  # its exit code (1=block, 2=warn, 0=clean) matches what the builtin returns.
+  _arxguard_scan_native() {
+    local out rc
+    out="$("$ARXGUARD_CHECK" -- "$1" 2>/dev/null)"; rc=$?
+    printf '%s\n' "$out" | tail -n +2
+    return $rc
+  }
 else
   printf '\n\033[1;31m  arxguard: native scanner unavailable; shell guard not loaded\033[0m\n\n' >&2
   return 0
 fi
-
-_arxguard_scan_native() {
-  arxguard_native "$1"
-}
 
 _arxguard_preexec() {
   [[ -n "${ARXGUARD_INTERNAL:-}" ]] && return 0
@@ -67,4 +84,4 @@ else
 fi
 unset _arxguard_prev_debug
 
-export ARXGUARD_ACTIVE=bash
+export ARXGUARD_ACTIVE="${_ARXGUARD_MODE:-bash}"

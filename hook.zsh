@@ -10,8 +10,9 @@ _ARXGUARD_ZSH_LOADED=1
 
 _arxguard_zsh_preexec() {
   [[ "${ARXGUARD:-1}" == "0" ]] && return 0
-  local line="$1" reason rc
-  reason="$(command arxguard check -- "$line" 2>/dev/null)"; rc=$?
+  local line="$1" out reason rc
+  out="$(command arxguard check -- "$line" 2>/dev/null)"; rc=$?
+  reason="${out#*$'\n'}"   # drop the "STATUS findings=N" header line; keep only the reasons
   if (( rc == 1 )); then
     print -u2 -P "%F{red}%B  arxguard: CRITICAL (zsh cannot block — review before it runs)%b%f"
     print -u2 -- "$reason" | sed 's/^/    /'

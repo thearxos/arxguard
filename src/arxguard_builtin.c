@@ -3,7 +3,7 @@
 #include "shell.h"
 #include "arxguard_engine.h"
 
-static char *arxguard_native_builtin(WORD_LIST *list){
+static int arxguard_native_builtin(WORD_LIST *list){
  const char *s=(list&&list->word)?list->word->word:"";
  struct arxguard_result r;
  arxguard_scan_cstr(s,&r);
