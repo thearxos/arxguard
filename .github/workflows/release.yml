@@ -1,0 +1,65 @@
+name: release
+
+# Public release for arxguard. Builds the native engine on Arch, assembles the over-the-air dist
+# tree (prebuilt binaries + install.sh), self-validates the archive, and publishes it to the
+# PUBLIC `<repo>-dist` release so the source repo can stay private while compiled binaries reach
+# users. The R2 update path (the one `arx update` reads) is published separately with arxpush
+# tool-publish.sh against this same dist tree — that step is credential/authority gated.
+#
+# Requires one secret: DIST_TOKEN — a token with contents:write on the `<repo>-dist` repository.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to build, e.g. v0.1.0'
+        required: true
+        default: 'v0.1.0'
+
+permissions:
+  contents: write
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Initialize Arch build environment
+        run: |
+          pacman-key --init
+          pacman-key --populate archlinux
+          pacman -Syu --noconfirm --needed base-devel cmake zstd bash github-cli
+      - name: Build + test + assemble the OTA dist
+        run: |
+          ./make-dist.sh dist-out
+          test -f dist-out/install.sh && [ ! -L dist-out/install.sh ]
+          test -x dist-out/bin/arxguard_check
+          test -x dist-out/bin/arxguard
+      - name: Pack the content-addressed OTA archive
+        run: |
+          tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner \
+            -C dist-out -cf - . | zstd -q -19 -o arxguard.tar.zst
+          sha256sum arxguard.tar.zst | tee arxguard.tar.zst.sha256
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: arxguard-${{ env.RELEASE_TAG }}-x86_64
+          path: |
+            arxguard.tar.zst
+            arxguard.tar.zst.sha256
+      - name: Publish to the PUBLIC -dist release
+        env:
+          GH_TOKEN: ${{ secrets.DIST_TOKEN }}
+        run: |
+          DIST="${GITHUB_REPOSITORY}-dist"
+          gh release create "$RELEASE_TAG" arxguard.tar.zst arxguard.tar.zst.sha256 \
+            --repo "$DIST" --title "arxguard $RELEASE_TAG" --generate-notes \
+          || gh release upload "$RELEASE_TAG" arxguard.tar.zst arxguard.tar.zst.sha256 --repo "$DIST" --clobber

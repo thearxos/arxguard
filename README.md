@@ -76,3 +76,20 @@ The scanner stays on the native hot path without a Bash detection parser or Pyth
 <div align="center">
 <sub><b>arxguard</b> is part of the <b>ArxOS</b> project, built by <b>Stingray Labs</b>.</sub>
 </div>
+
+## Over-the-air updates
+
+arxguard ships as a first-party ArxOS tool and updates over the air like the rest — no source
+build on the user's machine. `make-dist.sh` builds and tests the native engine, then assembles a
+self-contained `dist/` (prebuilt `arxguard_check`, the optional bash builtin, the wrapper, both
+shell hooks, and a prebuilt `install.sh`). That tree is published two ways:
+
+- **R2 (the update path `arx update` reads):** `arxpush tool-publish.sh arxguard dist/ <version>`
+  packs it to a content-addressed `tools/arxguard/<ver>/<sha>.tar.zst`, sha256-verified, and adds
+  arxguard to `tools.json`. Publishing is credential/authority gated (`ARXOS_PUBLISH_R2=1`).
+- **`arxguard-dist` GitHub release:** `.github/workflows/release.yml` builds on Arch CI and mirrors
+  the archive, so the source repo can stay private.
+
+The dist `install.sh` installs the prebuilt payload and wires **both** interactive shells — zsh
+(the ArxOS default) and bash — then self-checks that the installed engine still blocks a critical
+command, failing the update if it does not.
